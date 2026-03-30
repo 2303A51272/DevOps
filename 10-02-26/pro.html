@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>AI/ML Threat Monitor — SCM & PM Ops Center</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Sora:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:       #0a0e1a;
+    --surface:  #111827;
+    --surface2: #1a2235;
+    --border:   rgba(56,189,248,0.15);
+    --accent:   #38bdf8;
+    --accent2:  #818cf8;
+    --danger:   #f87171;
+    --warn:     #fbbf24;
+    --success:  #34d399;
+    --text:     #e2e8f0;
+    --muted:    #64748b;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Sora', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+  }
+
+  /* ─── ANIMATIONS ──────────────────────────────── */
+  @keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:0.35} }
+  @keyframes fadeIn   { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
+  @keyframes scanline { 0%{top:-10%} 100%{top:110%} }
+
+  /* ─── APP WRAPPER ─────────────────────────────── */
+  .app {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ═══════════════════════════════════════════════
+     LOGIN SCREEN
+  ═══════════════════════════════════════════════ */
+  .login-screen {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    background: var(--bg);
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* grid texture */
+  .login-screen::before {
+    content: '';
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 70% 45% at 50% 0%, rgba(56,189,248,0.09) 0%, transparent 70%),
+      repeating-linear-gradient(0deg,  transparent, transparent 39px, rgba(56,189,248,0.045) 39px, rgba(56,189,248,0.045) 40px),
+      repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(56,189,248,0.045) 39px, rgba(56,189,248,0.045) 40px);
+    pointer-events: none;
+  }
+
+  /* moving scanline */
+  .login-screen::after {
+    content: '';
+    position: absolute; left: 0; right: 0; height: 3px;
+    background: linear-gradient(transparent, rgba(56,189,248,0.18), transparent);
+    animation: scanline 6s linear infinite;
+    pointer-events: none;
+  }
+
+  .login-badge {
+    display: flex; align-items: center; gap: 8px;
+    background: rgba(56,189,248,0.08);
+    border: 0.5px solid rgba(56,189,248,0.3);
+    border-radius: 100px;
+    padding: 5px 14px 5px 8px;
+    margin-bottom: 2rem;
+    font-size: 11px; font-family: var(--mono);
+    color: var(--accent); letter-spacing: 0.06em; text-transform: uppercase;
+    position: relative; z-index: 1;
+  }
+
+  .badge-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: var(--success);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  .login-title {
+    font-size: 30px; font-weight: 600; letter-spacing: -0.6px;
+    text-align: center; margin-bottom: 6px;
+    color: var(--text); position: relative; z-index: 1;
+  }
+  .login-title span { color: var(--accent); }
+
+  .login-sub {
+    font-size: 12px; color: var(--muted); font-family: var(--mono);
+    text-align: center; margin-bottom: 2.5rem;
+    letter-spacing: 0.05em; position: relative; z-index: 1;
+  }
+
+  .login-card {
+    background: var(--surface);
+    border: 0.5px solid rgba(56,189,248,0.2);
+    border-radius: 14px;
+    padding: 2rem;
+    width: 100%; max-width: 380px;
+    position: relative; z-index: 1;
+    animation: fadeIn 0.5s ease both;
+  }
+
+  /* top accent line */
+  .login-card::before {
+    content: '';
+    position: absolute; top: 0; left: 20px; right: 20px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  }
+
+  .field-label {
+    font-size: 10px; font-family: var(--mono);
+    color: var(--muted); letter-spacing: 0.08em;
+    text-transform: uppercase; margin-bottom: 7px;
+  }
+
+  .field-group { margin-bottom: 1.1rem; }
+
+  .field-input {
+    width: 100%;
+    background: var(--bg);
+    border: 0.5px solid rgba(56,189,248,0.2);
+    border-radius: 7px;
+    padding: 10px 13px;
+    font-family: var(--mono); font-size: 13px;
+    color: var(--text); outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .field-input::placeholder { color: var(--muted); }
+  .field-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(56,189,248,0.08);
+  }
+
+  .role-row { display: flex; gap: 8px; margin-bottom: 1.4rem; }
+
+  .role-btn {
+    flex: 1; padding: 9px 0;
+    background: var(--bg);
+    border: 0.5px solid rgba(56,189,248,0.2);
+    border-radius: 7px;
+    font-family: var(--mono); font-size: 11px;
+    color: var(--muted); cursor: pointer;
+    transition: all 0.18s;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .role-btn:hover { border-color: rgba(56,189,248,0.5); color: var(--text); }
+  .role-btn.active {
+    background: rgba(56,189,248,0.1);
+    border-color: var(--accent); color: var(--accent);
+  }
+
+  .login-btn {
+    width: 100%;
+    background: var(--accent); color: #0a0e1a;
+    border: none; border-radius: 7px;
+    padding: 12px; font-family: var(--sans);
+    font-size: 14px; font-weight: 600; cursor: pointer;
+    transition: opacity 0.18s, transform 0.12s;
+    letter-spacing: 0.01em;
+  }
+  .login-btn:hover { opacity: 0.88; }
+  .login-btn:active { transform: scale(0.985); }
+
+  .login-err {
+    font-family: var(--mono); font-size: 11px;
+    color: var(--danger); text-align: center;
+    margin-top: 12px; min-height: 18px;
+    letter-spacing: 0.03em;
+  }
+
+  .login-footer {
+    margin-top: 1.5rem;
+    font-size: 10px; font-family: var(--mono);
+    color: var(--muted); text-align: center;
+    letter-spacing: 0.05em; position: relative; z-index: 1;
+  }
+
+  /* ═══════════════════════════════════════════════
+     DASHBOARD
+  ═══════════════════════════════════════════════ */
+  .dashboard {
+    display: none;
+    flex-direction: column;
+    min-height: 100vh;
+    background: var(--bg);
+    animation: fadeIn 0.4s ease both;
+  }
+
+  /* ── Top Bar ── */
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--surface);
+    border-bottom: 0.5px solid var(--border);
+    padding: 13px 24px;
+    position: sticky; top: 0; z-index: 5;
+  }
+
+  .topbar-left { display: flex; align-items: center; gap: 12px; }
+
+  .logo-mark {
+    width: 32px; height: 32px;
+    background: rgba(56,189,248,0.1);
+    border: 0.5px solid rgba(56,189,248,0.4);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .logo-mark svg { width: 16px; height: 16px; }
+
+  .topbar-title {
+    font-size: 14px; font-weight: 600;
+    color: var(--text); letter-spacing: -0.2px;
+  }
+  .topbar-sub {
+    font-size: 10px; color: var(--muted);
+    font-family: var(--mono); letter-spacing: 0.04em;
+  }
+
+  .topbar-right { display: flex; align-items: center; gap: 14px; }
+
+  .alert-bell {
+    position: relative; cursor: pointer;
+    width: 30px; height: 30px;
+    background: rgba(251,191,36,0.08);
+    border: 0.5px solid rgba(251,191,36,0.25);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+  }
+  .alert-bell .badge {
+    position: absolute; top: -4px; right: -4px;
+    width: 15px; height: 15px; border-radius: 50%;
+    background: var(--danger);
+    font-size: 9px; font-family: var(--mono); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .user-pill {
+    display: flex; align-items: center; gap: 7px;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: 100px;
+    padding: 4px 12px 4px 5px;
+  }
+  .user-avatar {
+    width: 24px; height: 24px; border-radius: 50%;
+    background: rgba(129,140,248,0.18);
+    border: 0.5px solid rgba(129,140,248,0.4);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; color: var(--accent2);
+    font-weight: 600; font-family: var(--mono);
+  }
+  .user-name { font-size: 12px; color: var(--text); font-family: var(--mono); }
+  .user-role { font-size: 10px; color: var(--muted); font-family: var(--mono); }
+
+  .logout-btn {
+    background: rgba(248,113,113,0.08);
+    border: 0.5px solid rgba(248,113,113,0.3);
+    border-radius: 7px; padding: 6px 14px;
+    font-family: var(--mono); font-size: 11px; color: var(--danger);
+    cursor: pointer; letter-spacing: 0.05em; text-transform: uppercase;
+    transition: background 0.18s;
+  }
+  .logout-btn:hover { background: rgba(248,113,113,0.18); }
+
+  /* ── Dashboard Body ── */
+  .dash-body {
+    flex: 1; padding: 20px 24px;
+    display: flex; flex-direction: column; gap: 16px;
+  }
+
+  /* ── Section label ── */
+  .section-label {
+    font-size: 10px; font-family: var(--mono);
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.1em; margin-bottom: 10px;
+  }
+
+  /* ── Stat Cards ── */
+  .stat-row {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0,1fr));
+    gap: 12px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    position: relative; overflow: hidden;
+  }
+  .stat-card::after {
+    content: ''; position: absolute;
+    top: 0; left: 0; right: 0; height: 2px;
+  }
+  .stat-card.c-danger::after { background: var(--danger); }
+  .stat-card.c-warn::after   { background: var(--warn); }
+  .stat-card.c-success::after{ background: var(--success); }
+  .stat-card.c-accent::after { background: var(--accent); }
+
+  .stat-label {
+    font-size: 10px; font-family: var(--mono);
+    color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.07em; margin-bottom: 8px;
+  }
+  .stat-val {
+    font-size: 28px; font-weight: 600;
+    font-family: var(--mono); color: var(--text); margin-bottom: 4px;
+  }
+  .stat-delta { font-size: 11px; font-family: var(--mono); }
+  .stat-delta.up   { color: var(--danger); }
+  .stat-delta.down { color: var(--success); }
+
+  /* ── Main 2-col grid ── */
+  .main-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+  }
+
+  /* ── Panels ── */
+  .panel {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .panel-header {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px;
+  }
+  .panel-title {
+    font-size: 11px; font-family: var(--mono);
+    color: var(--muted); text-transform: uppercase; letter-spacing: 0.07em;
+  }
+  .panel-badge {
+    font-size: 10px; font-family: var(--mono);
+    padding: 3px 9px; border-radius: 100px;
+  }
+  .panel-badge.live {
+    background: rgba(52,211,153,0.12);
+    color: var(--success);
+    border: 0.5px solid rgba(52,211,153,0.3);
+    animation: pulse 2.5s ease-in-out infinite;
+  }
+
+  /* ── Threat List ── */
+  .threat-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 0;
+    border-bottom: 0.5px solid rgba(56,189,248,0.07);
+  }
+  .threat-item:last-child { border-bottom: none; }
+
+  .threat-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .threat-dot.high { background: var(--danger); animation: pulse 1.8s ease-in-out infinite; }
+  .threat-dot.med  { background: var(--warn); }
+  .threat-dot.low  { background: var(--success); }
+
+  .threat-name {
+    font-size: 12px; color: var(--text); flex: 1;
+    font-family: var(--mono);
+  }
+  .threat-sev {
+    font-size: 10px; font-family: var(--mono);
+    padding: 2px 8px; border-radius: 4px;
+    letter-spacing: 0.05em; text-transform: uppercase;
+  }
+  .threat-sev.high { background: rgba(248,113,113,0.12); color: var(--danger); }
+  .threat-sev.med  { background: rgba(251,191,36,0.12);  color: var(--warn); }
+  .threat-sev.low  { background: rgba(52,211,153,0.12);  color: var(--success); }
+
+  /* ── Vulnerability Bars ── */
+  .vuln-row { margin-bottom: 12px; }
+  .vuln-top { display: flex; justify-content: space-between; margin-bottom: 5px; }
+  .vuln-name { font-size: 12px; color: var(--text); font-family: var(--mono); }
+  .vuln-pct  { font-size: 12px; color: var(--muted); font-family: var(--mono); }
+  .vuln-track {
+    height: 5px; background: rgba(56,189,248,0.1); border-radius: 3px;
+  }
+  .vuln-fill { height: 100%; border-radius: 3px; transition: width 1.2s ease; }
+
+  /* ── Bottom Row ── */
+  .bottom-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 14px;
+  }
+
+  /* ── Activity Log ── */
+  .log-item {
+    display: flex; gap: 10px; padding: 7px 0;
+    border-bottom: 0.5px solid rgba(56,189,248,0.07);
+    font-family: var(--mono); font-size: 11px;
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-time { color: var(--muted); min-width: 44px; }
+  .log-msg  { color: var(--text); flex: 1; line-height: 1.5; }
+  .log-tag  { color: var(--accent2); }
+
+  /* ── Session Info ── */
+  .sess-row {
+    display: flex; justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 0.5px solid rgba(56,189,248,0.07);
+  }
+  .sess-row:last-child { border-bottom: none; }
+  .sess-k { font-size: 11px; color: var(--muted); font-family: var(--mono); }
+  .sess-v { font-size: 11px; color: var(--text); font-family: var(--mono); }
+  .sess-v.accent  { color: var(--accent); }
+  .sess-v.accent2 { color: var(--accent2); }
+  .sess-v.success { color: var(--success); }
+
+  /* ═══════════════════════════════════════════════
+     LOGOUT CONFIRM OVERLAY
+  ═══════════════════════════════════════════════ */
+  .overlay-wrap {
+    display: none;
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(10,14,26,0.88);
+    align-items: center; justify-content: center;
+  }
+  .overlay-wrap.active { display: flex; }
+
+  .confirm-box {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 12px;
+    padding: 2rem; width: 300px; text-align: center;
+    animation: fadeIn 0.25s ease both;
+    position: relative;
+  }
+  .confirm-box::before {
+    content: '';
+    position: absolute; top: 0; left: 20px; right: 20px; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--danger), transparent);
+  }
+  .confirm-icon {
+    width: 48px; height: 48px; margin: 0 auto 14px;
+    background: rgba(248,113,113,0.1);
+    border: 0.5px solid rgba(248,113,113,0.35);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .confirm-title {
+    font-size: 17px; font-weight: 600; margin-bottom: 8px; color: var(--text);
+  }
+  .confirm-sub {
+    font-size: 11px; color: var(--muted); font-family: var(--mono);
+    margin-bottom: 1.5rem; line-height: 1.7;
+  }
+  .confirm-row { display: flex; gap: 10px; }
+  .confirm-cancel {
+    flex: 1; padding: 10px;
+    background: var(--surface2);
+    border: 0.5px solid var(--border);
+    border-radius: 7px;
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    cursor: pointer; transition: border-color 0.18s;
+  }
+  .confirm-cancel:hover { border-color: var(--accent); color: var(--text); }
+  .confirm-ok {
+    flex: 1; padding: 10px;
+    background: rgba(248,113,113,0.1);
+    border: 0.5px solid rgba(248,113,113,0.4);
+    border-radius: 7px;
+    font-family: var(--mono); font-size: 12px; color: var(--danger);
+    cursor: pointer; transition: background 0.18s;
+  }
+  .confirm-ok:hover { background: rgba(248,113,113,0.2); }
+
+  /* ── Responsive ── */
+  @media (max-width: 768px) {
+    .stat-row { grid-template-columns: repeat(2, 1fr); }
+    .main-grid { grid-template-columns: 1fr; }
+    .bottom-row { grid-template-columns: 1fr; }
+    .topbar { padding: 12px 16px; }
+    .dash-body { padding: 14px 16px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+
+  <!-- ═══ LOGIN SCREEN ═══ -->
+  <div class="login-screen" id="login-screen">
+    <div class="login-badge">
+      <div class="badge-dot"></div>
+      System Active — v2.4.1
+    </div>
+    <div class="login-title">AI/ML Threat<span> Monitor</span></div>
+    <div class="login-sub">SCM &amp; PM Cybersecurity Operations Center</div>
+
+    <div class="login-card">
+      <div class="field-group">
+        <div class="field-label">User ID</div>
+        <input class="field-input" id="user-id" type="text" placeholder="analyst@org.sec" autocomplete="off" />
+      </div>
+      <div class="field-group">
+        <div class="field-label">Access Key</div>
+        <input class="field-input" id="pass" type="password" placeholder="••••••••••" />
+      </div>
+      <div class="field-label" style="margin-bottom:9px;">Role</div>
+      <div class="role-row">
+        <button class="role-btn active" onclick="setRole(this,'Analyst')">Analyst</button>
+        <button class="role-btn" onclick="setRole(this,'Admin')">Admin</button>
+        <button class="role-btn" onclick="setRole(this,'Auditor')">Auditor</button>
+      </div>
+      <button class="login-btn" onclick="doLogin()">Authenticate &rarr;</button>
+      <div class="login-err" id="login-err"></div>
+    </div>
+
+    <div class="login-footer">
+      Penn State Schuylkill · Cybersecurity Research 2024 · IEEE ICETSIS
+    </div>
+  </div>
+
+  <!-- ═══ DASHBOARD ═══ -->
+  <div class="dashboard" id="dashboard">
+
+    <!-- Top Bar -->
+    <div class="topbar">
+      <div class="topbar-left">
+        <div class="logo-mark">
+          <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M8 1L14 4.5V11.5L8 15L2 11.5V4.5L8 1Z" stroke="#38bdf8" stroke-width="0.8"/>
+            <path d="M8 4.5L11 6.25V9.75L8 11.5L5 9.75V6.25L8 4.5Z" fill="#38bdf8" fill-opacity="0.35"/>
+          </svg>
+        </div>
+        <div>
+          <div class="topbar-title">AI/ML Threat Monitor</div>
+          <div class="topbar-sub" id="topbar-sub">SCM &amp; PM Ops Center</div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <div class="alert-bell" title="7 active alerts">
+          🔔
+          <div class="badge">7</div>
+        </div>
+        <div class="user-pill">
+          <div class="user-avatar" id="user-avatar">JS</div>
+          <div>
+            <div class="user-name" id="user-name-display">j.squillace</div>
+            <div class="user-role" id="user-role-display">Analyst</div>
+          </div>
+        </div>
+        <button class="logout-btn" onclick="showLogout()">⏻ Logout</button>
+      </div>
+    </div>
+
+    <!-- Body -->
+    <div class="dash-body">
+
+      <!-- Stat Cards -->
+      <div>
+        <div class="section-label">Threat Overview</div>
+        <div class="stat-row">
+          <div class="stat-card c-danger">
+            <div class="stat-label">Active Threats</div>
+            <div class="stat-val">7</div>
+            <div class="stat-delta up">▲ +3 today</div>
+          </div>
+          <div class="stat-card c-warn">
+            <div class="stat-label">Phishing Attempts</div>
+            <div class="stat-val">142</div>
+            <div class="stat-delta up">▲ +18 this week</div>
+          </div>
+          <div class="stat-card c-success">
+            <div class="stat-label">Threats Blocked</div>
+            <div class="stat-val">98.2%</div>
+            <div class="stat-delta down">▼ −0.4%</div>
+          </div>
+          <div class="stat-card c-accent">
+            <div class="stat-label">SCM Nodes Monitored</div>
+            <div class="stat-val">284</div>
+            <div class="stat-delta down">▼ 12 offline</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Main Grid -->
+      <div class="main-grid">
+
+        <!-- Threat List -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Active Threat Index</div>
+            <div class="panel-badge live">● Live</div>
+          </div>
+          <div class="threat-item">
+            <div class="threat-dot high"></div>
+            <div class="threat-name">Model Poisoning — SCM Forecast</div>
+            <div class="threat-sev high">High</div>
+          </div>
+          <div class="threat-item">
+            <div class="threat-dot high"></div>
+            <div class="threat-name">AI Spear Phishing Campaign</div>
+            <div class="threat-sev high">High</div>
+          </div>
+          <div class="threat-item">
+            <div class="threat-dot high"></div>
+            <div class="threat-name">ML Password Cracking — Auth</div>
+            <div class="threat-sev high">High</div>
+          </div>
+          <div class="threat-item">
+            <div class="threat-dot med"></div>
+            <div class="threat-name">Supply Chain Node Breach</div>
+            <div class="threat-sev med">Med</div>
+          </div>
+          <div class="threat-item">
+            <div class="threat-dot med"></div>
+            <div class="threat-name">Behavioral Data Exfiltration</div>
+            <div class="threat-sev med">Med</div>
+          </div>
+          <div class="threat-item">
+            <div class="threat-dot low"></div>
+            <div class="threat-name">Insider Threat Anomaly — PM</div>
+            <div class="threat-sev low">Low</div>
+          </div>
+          <div class="threat-item">
+            <div class="threat-dot low"></div>
+            <div class="threat-name">CPS Sensor Telemetry Spike</div>
+            <div class="threat-sev low">Low</div>
+          </div>
+        </div>
+
+        <!-- Vulnerability Index -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Vulnerability Index (Table III)</div>
+          </div>
+          <div class="vuln-row">
+            <div class="vuln-top">
+              <div class="vuln-name">User Behavior Exploits</div>
+              <div class="vuln-pct">87%</div>
+            </div>
+            <div class="vuln-track">
+              <div class="vuln-fill" style="width:87%;background:var(--danger)"></div>
+            </div>
+          </div>
+          <div class="vuln-row">
+            <div class="vuln-top">
+              <div class="vuln-name">Lack of Transparency</div>
+              <div class="vuln-pct">74%</div>
+            </div>
+            <div class="vuln-track">
+              <div class="vuln-fill" style="width:74%;background:var(--danger)"></div>
+            </div>
+          </div>
+          <div class="vuln-row">
+            <div class="vuln-top">
+              <div class="vuln-name">Inaccurate / Poisoned Data</div>
+              <div class="vuln-pct">67%</div>
+            </div>
+            <div class="vuln-track">
+              <div class="vuln-fill" style="width:67%;background:var(--warn)"></div>
+            </div>
+          </div>
+          <div class="vuln-row">
+            <div class="vuln-top">
+              <div class="vuln-name">Critical Infra Exposure</div>
+              <div class="vuln-pct">59%</div>
+            </div>
+            <div class="vuln-track">
+              <div class="vuln-fill" style="width:59%;background:var(--warn)"></div>
+            </div>
+          </div>
+          <div class="vuln-row">
+            <div class="vuln-top">
+              <div class="vuln-name">Supply Chain Attacks</div>
+              <div class="vuln-pct">53%</div>
+            </div>
+            <div class="vuln-track">
+              <div class="vuln-fill" style="width:53%;background:var(--warn)"></div>
+            </div>
+          </div>
+          <div class="vuln-row">
+            <div class="vuln-top">
+              <div class="vuln-name">Compliance Gaps</div>
+              <div class="vuln-pct">35%</div>
+            </div>
+            <div class="vuln-track">
+              <div class="vuln-fill" style="width:35%;background:var(--success)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom Row -->
+      <div class="bottom-row">
+
+        <!-- Activity Log -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Audit &amp; Activity Log</div>
+            <div class="panel-badge live">● Streaming</div>
+          </div>
+          <div class="log-item">
+            <div class="log-time">09:41</div>
+            <div class="log-msg">Model poisoning attempt detected on demand-forecast ML module</div>
+            <div class="log-tag">[SCM]</div>
+          </div>
+          <div class="log-item">
+            <div class="log-time">09:38</div>
+            <div class="log-msg">AI spear-phishing email intercepted — CFO credentials targeted</div>
+            <div class="log-tag">[PM]</div>
+          </div>
+          <div class="log-item">
+            <div class="log-time">09:31</div>
+            <div class="log-msg">ML brute-force credential stuffing — 3,412 attempts blocked by CPS</div>
+            <div class="log-tag">[AUTH]</div>
+          </div>
+          <div class="log-item">
+            <div class="log-time">09:17</div>
+            <div class="log-msg">Anomalous data access pattern flagged — supply node #B-214</div>
+            <div class="log-tag">[ML]</div>
+          </div>
+          <div class="log-item">
+            <div class="log-time">08:52</div>
+            <div class="log-msg">CPS sensor telemetry anomaly — warehouse zone 4, inventory skew detected</div>
+            <div class="log-tag">[CPS]</div>
+          </div>
+          <div class="log-item">
+            <div class="log-time">08:30</div>
+            <div class="log-msg">Compliance scan complete — 3 policy gaps identified in SCM SOP</div>
+            <div class="log-tag">[AUDIT]</div>
+          </div>
+        </div>
+
+        <!-- Session Info -->
+        <div class="panel">
+          <div class="panel-header">
+            <div class="panel-title">Session Info</div>
+          </div>
+          <div class="sess-row">
+            <div class="sess-k">User</div>
+            <div class="sess-v" id="sess-user">—</div>
+          </div>
+          <div class="sess-row">
+            <div class="sess-k">Role</div>
+            <div class="sess-v accent2" id="sess-role">—</div>
+          </div>
+          <div class="sess-row">
+            <div class="sess-k">Login Time</div>
+            <div class="sess-v" id="sess-time">—</div>
+          </div>
+          <div class="sess-row">
+            <div class="sess-k">Status</div>
+            <div class="sess-v success">● Authenticated</div>
+          </div>
+          <div class="sess-row">
+            <div class="sess-k">CIA Triad</div>
+            <div class="sess-v accent">C · I · A</div>
+          </div>
+          <div class="sess-row">
+            <div class="sess-k">Framework</div>
+            <div class="sess-v" style="color:var(--muted)">SCM + PM + CPS</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div><!-- /.dashboard -->
+
+  <!-- ═══ LOGOUT CONFIRM OVERLAY ═══ -->
+  <div class="overlay-wrap" id="logout-overlay">
+    <div class="confirm-box">
+      <div class="confirm-icon">⚠</div>
+      <div class="confirm-title">End Session?</div>
+      <div class="confirm-sub">
+        All audit logs will be preserved.<br/>
+        Session token will be revoked immediately.
+      </div>
+      <div class="confirm-row">
+        <button class="confirm-cancel" onclick="hideLogout()">Cancel</button>
+        <button class="confirm-ok" onclick="doLogout()">Logout</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /.app -->
+
+<script>
+  var currentRole = 'Analyst';
+
+  function setRole(btn, role) {
+    document.querySelectorAll('.role-btn').forEach(function(b) {
+      b.classList.remove('active');
+    });
+    btn.classList.add('active');
+    currentRole = role;
+  }
+
+  function doLogin() {
+    var uid = document.getElementById('user-id').value.trim();
+    var pw  = document.getElementById('pass').value;
+    var err = document.getElementById('login-err');
+
+    if (!uid) { err.textContent = '> user_id required'; return; }
+    if (pw.length < 4) { err.textContent = '> access_key must be 4+ characters'; return; }
+
+    err.textContent = '> authenticating...';
+
+    setTimeout(function() {
+      var letters  = uid.replace(/@.*/, '').replace(/[^a-zA-Z]/g, '');
+      var initials = letters.slice(0, 2).toUpperCase() || 'U?';
+      var shortName = uid.split('@')[0].slice(0, 14);
+
+      document.getElementById('user-avatar').textContent = initials;
+      document.getElementById('user-name-display').textContent = shortName;
+      document.getElementById('user-role-display').textContent = currentRole;
+
+      document.getElementById('sess-user').textContent = shortName;
+      document.getElementById('sess-role').textContent = currentRole;
+
+      var now = new Date();
+      var hh = now.getHours().toString().padStart(2, '0');
+      var mm = now.getMinutes().toString().padStart(2, '0');
+      document.getElementById('sess-time').textContent = hh + ':' + mm;
+
+      document.getElementById('topbar-sub').textContent =
+        'Role: ' + currentRole + ' — SCM/PM Ops';
+
+      document.getElementById('login-screen').style.display = 'none';
+      var dash = document.getElementById('dashboard');
+      dash.style.display = 'flex';
+      err.textContent = '';
+    }, 800);
+  }
+
+  function showLogout() {
+    document.getElementById('logout-overlay').classList.add('active');
+  }
+
+  function hideLogout() {
+    document.getElementById('logout-overlay').classList.remove('active');
+  }
+
+  function doLogout() {
+    hideLogout();
+    document.getElementById('dashboard').style.display = 'none';
+    document.getElementById('user-id').value = '';
+    document.getElementById('pass').value = '';
+    document.getElementById('login-err').textContent = '';
+    document.getElementById('login-screen').style.display = 'flex';
+  }
+
+  document.getElementById('pass').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') doLogin();
+  });
+</script>
+
+</body>
+</html>
